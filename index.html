@@ -4,6 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>WC 2026 Predictor</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 :root{
   --bg:#f0f4f8;--s1:#fff;--border:#e2e8f0;--accent:#e85d04;
@@ -240,12 +243,29 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   .login-box{padding:28px 20px;}
   .score-chip{display:none;}
 }
+
+/* ── LOADING SCREEN ── */
+#loadingScreen{
+  position:fixed;inset:0;background:linear-gradient(135deg,var(--navy) 0%,var(--accent) 100%);
+  display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px;
+}
+.spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,.25);
+  border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{color:#fff;font-size:.95rem;font-weight:600;opacity:.85;}
 </style>
 </head>
 <body>
 
+<!-- LOADING -->
+<div id="loadingScreen">
+  <div style="font-size:3rem;">⚽</div>
+  <div class="spinner"></div>
+  <div class="loading-text">Loading WC 2026 Predictor...</div>
+</div>
+
 <!-- LOGIN -->
-<div id="loginScreen">
+<div id="loginScreen" style="display:none;">
   <div class="login-box">
     <div class="login-logo">⚽</div>
     <div class="login-title">WC 2026 Predictor</div>
@@ -527,28 +547,80 @@ function fl(t){
   return img+t;
 }
 
-var STORE='wc2026_v3';
-var DB,currentUser,isAdmin;
+// ══════════════════════════════════════════════════
+//  FIREBASE CONFIG — replace with your project values
+//  1. Go to console.firebase.google.com
+//  2. Create project → Add web app → copy config below
+//  3. In Firebase console: Build → Realtime Database → Create database (test mode)
+// ══════════════════════════════════════════════════
+var FIREBASE_CONFIG = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL: "https://PASTE_YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+  projectId: "PASTE_YOUR_PROJECT_ID",
+  storageBucket: "PASTE_YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "PASTE_YOUR_SENDER_ID",
+  appId: "PASTE_YOUR_APP_ID"
+};
+// ══════════════════════════════════════════════════
+
+var STORE='wc2026_v3'; // localStorage fallback key
+var DB_REF = null;
+var DB, currentUser, isAdmin;
+var _renderTimer = null;
+var _usingFirebase = (FIREBASE_CONFIG.apiKey !== 'PASTE_YOUR_API_KEY');
 
 function defaultDB(){
   return {adminPass:'admin2026',users:{},pending:{},answers:{},koTeams:{},awardAns:{},locked:false,lastCalc:null};
 }
-function loadDB(){
-  try{
-    var d=JSON.parse(localStorage.getItem(STORE));
-    if(!d) return defaultDB();
-    if(!d.pending) d.pending={};
-    if(!d.koTeams) d.koTeams={};
-    if(!d.awardAns) d.awardAns={};
-    if(!d.answers) d.answers={};
-    Object.keys(d.users||{}).forEach(function(n){
-      if(d.users[n].confirmedGS===undefined) d.users[n].confirmedGS=false;
-      if(d.users[n].confirmedKO===undefined) d.users[n].confirmedKO=false;
-    });
-    return d;
-  }catch(e){return defaultDB();}
+function migrateDB(d){
+  if(!d) return defaultDB();
+  if(!d.pending) d.pending={};
+  if(!d.koTeams) d.koTeams={};
+  if(!d.awardAns) d.awardAns={};
+  if(!d.answers) d.answers={};
+  Object.keys(d.users||{}).forEach(function(n){
+    if(d.users[n].confirmedGS===undefined) d.users[n].confirmedGS=false;
+    if(d.users[n].confirmedKO===undefined) d.users[n].confirmedKO=false;
+  });
+  return d;
 }
-function saveDB(){localStorage.setItem(STORE,JSON.stringify(DB));}
+function saveDB(){
+  if(_usingFirebase && DB_REF){
+    DB_REF.set(JSON.parse(JSON.stringify(DB)));
+  } else {
+    localStorage.setItem(STORE, JSON.stringify(DB));
+  }
+}
+
+// ── Bootstrap: load data then show login ──
+(function(){
+  if(!_usingFirebase){
+    // localStorage fallback
+    try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
+    catch(e){ DB=defaultDB(); }
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('loginScreen').style.display='flex';
+    return;
+  }
+  try{ firebase.initializeApp(FIREBASE_CONFIG); }catch(e){}
+  DB_REF = firebase.database().ref('wc2026');
+  DB_REF.once('value', function(snapshot){
+    DB = migrateDB(snapshot.val());
+    if(!snapshot.val()){ saveDB(); }
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('loginScreen').style.display='flex';
+  }, function(err){
+    // Firebase error — show message
+    document.getElementById('loadingScreen').innerHTML=
+      '<div style="text-align:center;color:#fff;padding:40px;max-width:340px;">'+
+      '<div style="font-size:2.5rem;">⚠️</div>'+
+      '<div style="font-size:1.1rem;font-weight:700;margin-top:12px;">Firebase not configured</div>'+
+      '<div style="font-size:.82rem;margin-top:10px;opacity:.85;line-height:1.6;">'+
+      'Open the HTML file and replace the values inside <b>FIREBASE_CONFIG</b> with your Firebase project credentials.<br><br>'+
+      'Error: '+err.message+'</div></div>';
+  });
+})();
 
 DB=loadDB(); currentUser=null; isAdmin=false;
 
@@ -579,15 +651,26 @@ function doLogin(){
   var name=document.getElementById('uLogin').value.trim();
   var pass=document.getElementById('pLogin').value;
   if(!name||!pass) return msg('Enter username and password.',false);
-  if(name.toLowerCase()==='admin'){
-    if(pass!==DB.adminPass) return msg('Wrong admin password.',false);
-    currentUser='Admin'; isAdmin=true; startApp(); return;
+  msg('Checking...', true);
+  // Always fetch fresh DB from Firebase before login check
+  function check(){
+    if(name.toLowerCase()==='admin'){
+      if(pass!==DB.adminPass) return msg('Wrong admin password.',false);
+      currentUser='Admin'; isAdmin=true; startApp(); return;
+    }
+    if(DB.pending[name]) return msg('Your account is pending admin approval.',false);
+    var u=DB.users[name];
+    if(!u) return msg('Account not found. Please sign up.',false);
+    if(u.pass!==pass) return msg('Wrong password.',false);
+    currentUser=name; isAdmin=false; startApp();
   }
-  if(DB.pending[name]) return msg('Your account is pending admin approval.',false);
-  var u=DB.users[name];
-  if(!u) return msg('Account not found. Please sign up.',false);
-  if(u.pass!==pass) return msg('Wrong password.',false);
-  currentUser=name; isAdmin=false; startApp();
+  if(_usingFirebase && DB_REF){
+    DB_REF.once('value', function(snapshot){
+      DB=migrateDB(snapshot.val()); check();
+    }, function(){ check(); });
+  } else {
+    check();
+  }
 }
 function doSignup(){
   var name=document.getElementById('uReg').value.trim();
@@ -607,6 +690,8 @@ function doSignup(){
   document.getElementById('pReg2').value='';
 }
 function doLogout(){
+  if(_usingFirebase && DB_REF) DB_REF.off(); // remove real-time listener
+  clearTimeout(_renderTimer);
   currentUser=null; isAdmin=false;
   document.getElementById('app').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -624,6 +709,16 @@ function startApp(){
   document.getElementById('scoreChip').style.display=isAdmin?'none':'';
   renderAll();
   showPanel('groups');
+  // Real-time sync: when another device changes data, update this UI
+  if(_usingFirebase && DB_REF){
+    DB_REF.on('value', function(snapshot){
+      if(!currentUser) return;
+      DB=migrateDB(snapshot.val());
+      // Debounce re-renders so rapid local saves don't flicker
+      clearTimeout(_renderTimer);
+      _renderTimer=setTimeout(function(){ renderAll(); }, 600);
+    });
+  }
 }
 
 // CONFIRM

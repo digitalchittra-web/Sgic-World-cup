@@ -431,7 +431,7 @@ function fl(t){
   return img+t;
 }
 
-var STORE = 'wc2026_v4';
+var STORE = 'wc2026_v3';
 var DB, currentUser, isAdmin;
 
 function defaultDB(){
@@ -445,6 +445,11 @@ function loadDB(){
     if(!d.koTeams) d.koTeams={};
     if(!d.awardAns) d.awardAns={};
     if(!d.answers) d.answers={};
+    // migrate old user records
+    Object.keys(d.users||{}).forEach(function(n){
+      if(d.users[n].confirmedGS===undefined) d.users[n].confirmedGS=false;
+      if(d.users[n].confirmedKO===undefined) d.users[n].confirmedKO=false;
+    });
     return d;
   }catch(e){ return defaultDB(); }
 }

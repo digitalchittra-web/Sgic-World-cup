@@ -578,21 +578,20 @@ function fl(t){
 }
 
 var STORE='wc2026_v3';
-// Shared cloud storage — syncs data across all devices automatically
-var BLOB_URL='https://jsonblob.com/api/jsonBlob/019e689b-4972-72bd-9bf9-f067bd7b6a11';
+var API='/api/db'; // Vercel serverless function — same origin, no CORS issues
 var _pollInterval = null;
 var DB, currentUser, isAdmin;
 var _renderTimer = null;
 
 function cloudGet(cb){
-  fetch(BLOB_URL,{headers:{'Accept':'application/json'}})
+  fetch(API)
     .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(d){ cb(null,d); })
     .catch(function(e){ cb(e,null); });
 }
 function cloudPut(data){
-  fetch(BLOB_URL,{method:'PUT',
-    headers:{'Content-Type':'application/json','Accept':'application/json'},
+  fetch(API,{method:'PUT',
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify(data)})
     .catch(function(e){ console.warn('Cloud save failed',e); });
 }
@@ -693,8 +692,8 @@ function doSignup(){
     if(DB.pending[name]) return msg('Already pending. Please wait.',false);
     DB.pending[name]={pass:pass,requestedAt:new Date().toLocaleString()};
     // Save and confirm
-    fetch(BLOB_URL,{method:'PUT',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
+    fetch(API,{method:'PUT',
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify(JSON.parse(JSON.stringify(DB)))})
       .then(function(r){
         if(!r.ok) throw new Error('HTTP '+r.status);

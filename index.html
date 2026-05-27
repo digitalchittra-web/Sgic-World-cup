@@ -685,14 +685,29 @@ function doSignup(){
   if(name.toLowerCase()==='admin') return msg('That username is reserved.',false);
   if(pass.length<4) return msg('Password must be at least 4 characters.',false);
   if(pass!==pass2) return msg('Passwords do not match.',false);
-  if(DB.users[name]) return msg('Username taken.',false);
-  if(DB.pending[name]) return msg('Already pending. Please wait.',false);
-  DB.pending[name]={pass:pass,requestedAt:new Date().toLocaleString()};
-  saveDB();
-  msg('Account requested! Wait for admin approval.',true);
-  document.getElementById('uReg').value='';
-  document.getElementById('pReg').value='';
-  document.getElementById('pReg2').value='';
+  msg('Sending request...', true);
+  // Fetch latest DB first to avoid overwriting other signups
+  cloudGet(function(err,data){
+    if(!err&&data) DB=migrateDB(data);
+    if(DB.users[name]) return msg('Username taken.',false);
+    if(DB.pending[name]) return msg('Already pending. Please wait.',false);
+    DB.pending[name]={pass:pass,requestedAt:new Date().toLocaleString()};
+    // Save and confirm
+    fetch(BLOB_URL,{method:'PUT',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(JSON.parse(JSON.stringify(DB)))})
+      .then(function(r){
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        localStorage.setItem(STORE, JSON.stringify(DB));
+        msg('Account requested! Wait for admin approval.',true);
+        document.getElementById('uReg').value='';
+        document.getElementById('pReg').value='';
+        document.getElementById('pReg2').value='';
+      })
+      .catch(function(e){
+        msg('Error saving: '+e.message+'. Try again.',false);
+      });
+  });
 }
 function doLogout(){
   if(_pollInterval){ clearInterval(_pollInterval); _pollInterval=null; }
@@ -794,6 +809,12 @@ function showAdmTab(t){
   document.querySelectorAll('.admin-tab').forEach(function(b,i){b.classList.toggle('active',tabs[i]===t);});
   document.querySelectorAll('.adm-panel').forEach(function(p){p.classList.remove('active');});
   document.getElementById('adm-'+t).classList.add('active');
+  // Always fetch latest from cloud when opening the Players tab
+  if(t==='manage'){
+    cloudGet(function(err,data){
+      if(!err&&data){ DB=migrateDB(data); renderManage(); }
+    });
+  }
 }
 
 // GROUP STAGE

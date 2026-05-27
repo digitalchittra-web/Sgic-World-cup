@@ -317,6 +317,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div class="sidenav" id="sidenav">
       <div class="nav-section">Predictions</div>
       <div class="nav-item active" id="nav-groups" onclick="showPanel('groups')">🏟️ Group Stage <span class="nav-badge">+3</span></div>
+      <div class="nav-item" id="nav-r32" onclick="showPanel('r32')">🔥 Round of 32 <span class="nav-badge">+4</span></div>
       <div class="nav-item" id="nav-r16" onclick="showPanel('r16')">⚔️ Round of 16 <span class="nav-badge">+5</span></div>
       <div class="nav-item" id="nav-qf" onclick="showPanel('qf')">🏆 Quarter Finals <span class="nav-badge">+8</span></div>
       <div class="nav-item" id="nav-sf" onclick="showPanel('sf')">🌟 Semi Finals <span class="nav-badge">+12</span></div>
@@ -338,28 +339,38 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <div id="groupsContainer"></div>
       </div>
 
+      <!-- ROUND OF 32 -->
+      <div class="panel" id="panel-r32">
+        <div class="page-title">🔥 Round of 32 <span style="font-size:.78rem;font-weight:400;color:var(--muted)">— 4 pts each</span></div>
+        <div id="r32Banner"></div>
+        <div class="ko-grid" id="r32Container"></div>
+      </div>
+
       <!-- ROUND OF 16 -->
       <div class="panel" id="panel-r16">
         <div class="page-title">⚔️ Round of 16 <span style="font-size:.78rem;font-weight:400;color:var(--muted)">— 5 pts each</span></div>
-        <div id="koBanner"></div>
+        <div id="r16Banner"></div>
         <div class="ko-grid" id="r16Container"></div>
       </div>
 
       <!-- QUARTER FINALS -->
       <div class="panel" id="panel-qf">
         <div class="page-title">🏆 Quarter Finals <span style="font-size:.78rem;font-weight:400;color:var(--muted)">— 8 pts each</span></div>
+        <div id="qfBanner"></div>
         <div class="ko-grid" id="qfContainer"></div>
       </div>
 
       <!-- SEMI FINALS -->
       <div class="panel" id="panel-sf">
         <div class="page-title">🌟 Semi Finals <span style="font-size:.78rem;font-weight:400;color:var(--muted)">— 12 pts each</span></div>
+        <div id="sfBanner"></div>
         <div class="ko-grid" id="sfContainer"></div>
       </div>
 
       <!-- FINAL -->
       <div class="panel" id="panel-final">
         <div class="page-title">🥇 Final &amp; 3rd Place <span style="font-size:.78rem;font-weight:400;color:var(--muted)">— 12/15 pts</span></div>
+        <div id="finalBanner"></div>
         <div class="ko-grid" id="finalContainer"></div>
       </div>
 
@@ -450,16 +461,36 @@ GROUPS.forEach(function(g){
 });
 
 var KO=[
+  // Round of 32 — 16 matches
+  {id:'r32_0',stage:'r32',label:'R32',pts:4,num:1},{id:'r32_1',stage:'r32',label:'R32',pts:4,num:2},
+  {id:'r32_2',stage:'r32',label:'R32',pts:4,num:3},{id:'r32_3',stage:'r32',label:'R32',pts:4,num:4},
+  {id:'r32_4',stage:'r32',label:'R32',pts:4,num:5},{id:'r32_5',stage:'r32',label:'R32',pts:4,num:6},
+  {id:'r32_6',stage:'r32',label:'R32',pts:4,num:7},{id:'r32_7',stage:'r32',label:'R32',pts:4,num:8},
+  {id:'r32_8',stage:'r32',label:'R32',pts:4,num:9},{id:'r32_9',stage:'r32',label:'R32',pts:4,num:10},
+  {id:'r32_10',stage:'r32',label:'R32',pts:4,num:11},{id:'r32_11',stage:'r32',label:'R32',pts:4,num:12},
+  {id:'r32_12',stage:'r32',label:'R32',pts:4,num:13},{id:'r32_13',stage:'r32',label:'R32',pts:4,num:14},
+  {id:'r32_14',stage:'r32',label:'R32',pts:4,num:15},{id:'r32_15',stage:'r32',label:'R32',pts:4,num:16},
+  // Round of 16 — 8 matches
   {id:'r16_0',stage:'r16',label:'R16',pts:5,num:1},{id:'r16_1',stage:'r16',label:'R16',pts:5,num:2},
   {id:'r16_2',stage:'r16',label:'R16',pts:5,num:3},{id:'r16_3',stage:'r16',label:'R16',pts:5,num:4},
   {id:'r16_4',stage:'r16',label:'R16',pts:5,num:5},{id:'r16_5',stage:'r16',label:'R16',pts:5,num:6},
   {id:'r16_6',stage:'r16',label:'R16',pts:5,num:7},{id:'r16_7',stage:'r16',label:'R16',pts:5,num:8},
+  // Quarter Finals
   {id:'qf_0',stage:'qf',label:'QF',pts:8,num:1},{id:'qf_1',stage:'qf',label:'QF',pts:8,num:2},
   {id:'qf_2',stage:'qf',label:'QF',pts:8,num:3},{id:'qf_3',stage:'qf',label:'QF',pts:8,num:4},
+  // Semi Finals
   {id:'sf_0',stage:'sf',label:'SF',pts:12,num:1},{id:'sf_1',stage:'sf',label:'SF',pts:12,num:2},
+  // 3rd Place & Final
   {id:'tp_0',stage:'tp',label:'3rd Place',pts:12,num:1},
   {id:'fin_0',stage:'fin',label:'Final',pts:15,num:1},
 ];
+
+// Per-stage confirmation field mapping
+var STAGE_CONFIRM={
+  r32:'confirmedR32', r16:'confirmedR16',
+  qf:'confirmedQF',  sf:'confirmedSF',
+  tp:'confirmedFinal', fin:'confirmedFinal'
+};
 
 var AWARDS=[
   {id:'winner',icon:'🌍',name:'Tournament Winner',pts:15,type:'team'},
@@ -580,8 +611,13 @@ function migrateDB(d){
   if(!d.awardAns) d.awardAns={};
   if(!d.answers) d.answers={};
   Object.keys(d.users||{}).forEach(function(n){
-    if(d.users[n].confirmedGS===undefined) d.users[n].confirmedGS=false;
-    if(d.users[n].confirmedKO===undefined) d.users[n].confirmedKO=false;
+    var u=d.users[n];
+    if(u.confirmedGS===undefined) u.confirmedGS=false;
+    if(u.confirmedR32===undefined) u.confirmedR32=false;
+    if(u.confirmedR16===undefined) u.confirmedR16=false;
+    if(u.confirmedQF===undefined) u.confirmedQF=false;
+    if(u.confirmedSF===undefined) u.confirmedSF=false;
+    if(u.confirmedFinal===undefined) u.confirmedFinal=false;
   });
   return d;
 }
@@ -721,22 +757,23 @@ function startApp(){
   }
 }
 
-// CONFIRM
-function confirmGS(){
+// CONFIRM — one function per round
+function confirmRound(field,label){
   if(!currentUser||!DB.users[currentUser]) return;
-  if(!confirm('Lock your Group Stage & Awards predictions? You will not be able to change them after this.')) return;
-  DB.users[currentUser].confirmedGS=true;
+  if(!confirm('Lock your '+label+' predictions? You will not be able to change them after this.')) return;
+  DB.users[currentUser][field]=true;
   saveDB(); renderAll();
 }
-function confirmKO(){
-  if(!currentUser||!DB.users[currentUser]) return;
-  if(!confirm('Lock your Knockout predictions (R16 to Final)? You will not be able to change them after this.')) return;
-  DB.users[currentUser].confirmedKO=true;
-  saveDB(); renderAll();
-}
+function confirmGS(){ confirmRound('confirmedGS','Group Stage & Awards'); }
+function confirmR32(){ confirmRound('confirmedR32','Round of 32'); }
+function confirmR16(){ confirmRound('confirmedR16','Round of 16'); }
+function confirmQF(){ confirmRound('confirmedQF','Quarter Finals'); }
+function confirmSF(){ confirmRound('confirmedSF','Semi Finals'); }
+function confirmFinal(){ confirmRound('confirmedFinal','Final & 3rd Place'); }
 
 function renderAll(){
   renderGroups();
+  renderKO('r32Container','r32');
   renderKO('r16Container','r16');
   renderKO('qfContainer','qf');
   renderKO('sfContainer','sf');
@@ -748,28 +785,30 @@ function renderAll(){
   renderBanners();
 }
 
+function makeBanner(elId,locked,lockedMsg,openMsg,confirmFn,btnLabel){
+  var el=document.getElementById(elId);
+  if(!el) return;
+  if(locked){
+    el.innerHTML='<div class="confirm-banner done"><div class="cb-text">✔ <b>'+lockedMsg+'</b> Ask admin to unlock.</div></div>';
+  } else if(confirmFn){
+    el.innerHTML='<div class="confirm-banner"><div class="cb-text">'+openMsg+'</div>'+
+      '<button class="cb-btn green" onclick="'+confirmFn+'()">✔ '+btnLabel+'</button></div>';
+  } else {
+    el.innerHTML='<div class="confirm-banner"><div class="cb-text">'+openMsg+'</div></div>';
+  }
+}
+
 function renderBanners(){
   if(isAdmin) return;
   var u=DB.users[currentUser];
-  var cgs=u&&u.confirmedGS;
-  var cko=u&&u.confirmedKO;
-
-  var gsBanner=document.getElementById('gsBanner');
-  if(gsBanner) gsBanner.innerHTML=cgs
-    ?'<div class="confirm-banner done"><div class="cb-text">✔ <b>Group Stage &amp; Awards are locked.</b> Ask admin to unlock.</div></div>'
-    :'<div class="confirm-banner"><div class="cb-text"><b>Make your picks below.</b> Tap confirm when ready to lock them in.</div>'+
-      '<button class="cb-btn green" onclick="confirmGS()">✔ Confirm GS &amp; Awards</button></div>';
-
-  var koBanner=document.getElementById('koBanner');
-  if(koBanner) koBanner.innerHTML=cko
-    ?'<div class="confirm-banner done"><div class="cb-text">✔ <b>Knockout predictions are locked.</b> Ask admin to unlock.</div></div>'
-    :'<div class="confirm-banner"><div class="cb-text"><b>Pick your knockout winners.</b> Tap confirm when ready to lock them in.</div>'+
-      '<button class="cb-btn green" onclick="confirmKO()">✔ Confirm Knockouts</button></div>';
-
-  var aBanner=document.getElementById('awardsBanner');
-  if(aBanner) aBanner.innerHTML=cgs
-    ?'<div class="confirm-banner done"><div class="cb-text">✔ <b>Awards predictions are locked.</b> Ask admin to unlock.</div></div>'
-    :'<div class="confirm-banner"><div class="cb-text"><b>Predict the award winners below.</b> Locked together with Group Stage.</div></div>';
+  if(!u) return;
+  makeBanner('gsBanner',    u.confirmedGS,    'Group Stage &amp; Awards locked.',       '<b>Make your group stage picks.</b> Confirm when done.',          'confirmGS',    'Confirm GS &amp; Awards');
+  makeBanner('awardsBanner',u.confirmedGS,    'Awards locked.',                         '<b>Predict the award winners.</b> Locked together with Group Stage.',null,          null);
+  makeBanner('r32Banner',   u.confirmedR32,   'Round of 32 locked.',                    '<b>Pick your Round of 32 winners.</b> Confirm when done.',        'confirmR32',   'Confirm Round of 32');
+  makeBanner('r16Banner',   u.confirmedR16,   'Round of 16 locked.',                    '<b>Pick your Round of 16 winners.</b> Confirm when done.',        'confirmR16',   'Confirm Round of 16');
+  makeBanner('qfBanner',    u.confirmedQF,    'Quarter Finals locked.',                 '<b>Pick your Quarter Final winners.</b> Confirm when done.',      'confirmQF',    'Confirm Quarter Finals');
+  makeBanner('sfBanner',    u.confirmedSF,    'Semi Finals locked.',                    '<b>Pick your Semi Final winners.</b> Confirm when done.',         'confirmSF',    'Confirm Semi Finals');
+  makeBanner('finalBanner', u.confirmedFinal, 'Final &amp; 3rd Place locked.',          '<b>Pick Final &amp; 3rd Place winners.</b> Confirm when done.',   'confirmFinal', 'Confirm Final &amp; 3rd');
 }
 
 function showPanel(id){
@@ -832,8 +871,9 @@ function renderKO(cid,stage){
   var matches=KO.filter(function(m){return m.stage===stage;});
   var preds=isAdmin?{}:(DB.users[currentUser]?DB.users[currentUser].predictions||{}:{});
   var u=DB.users[currentUser];
-  var confirmedKO=!isAdmin&&u&&u.confirmedKO;
-  var locked=(!isAdmin&&DB.locked)||confirmedKO;
+  var cf=STAGE_CONFIRM[stage];
+  var stageConfirmed=!isAdmin&&u&&u[cf];
+  var locked=(!isAdmin&&DB.locked)||stageConfirmed;
   var html='';
   matches.forEach(function(m){
     var teams=DB.koTeams[m.id]||{};
@@ -859,8 +899,8 @@ function renderFinal(){
   var matches=KO.filter(function(m){return m.stage==='fin'||m.stage==='tp';});
   var preds=isAdmin?{}:(DB.users[currentUser]?DB.users[currentUser].predictions||{}:{});
   var u=DB.users[currentUser];
-  var confirmedKO=!isAdmin&&u&&u.confirmedKO;
-  var locked=(!isAdmin&&DB.locked)||confirmedKO;
+  var stageConfirmed=!isAdmin&&u&&u.confirmedFinal;
+  var locked=(!isAdmin&&DB.locked)||stageConfirmed;
   var html='';
   matches.forEach(function(m){
     var teams=DB.koTeams[m.id]||{};
@@ -884,7 +924,9 @@ function renderFinal(){
   document.getElementById('finalContainer').innerHTML=html;
 }
 function koPick(id,val){
-  if(DB.locked||!DB.users[currentUser]||DB.users[currentUser].confirmedKO) return;
+  var m=KO.filter(function(x){return x.id===id;})[0];
+  var cf=m?STAGE_CONFIRM[m.stage]:'';
+  if(DB.locked||!DB.users[currentUser]||(cf&&DB.users[currentUser][cf])) return;
   if(!DB.users[currentUser].predictions) DB.users[currentUser].predictions={};
   DB.users[currentUser].predictions[id]=val;
   saveDB(); renderAll();
@@ -1050,13 +1092,21 @@ function renderManage(){
   var approved=Object.entries(DB.users||{});
   document.getElementById('approvedGrid').innerHTML=approved.length?approved.map(function(e){
     var name=e[0],u=e[1];
-    var cgs=u.confirmedGS,cko=u.confirmedKO;
-    var tags='';
-    if(cgs) tags+='<span style="font-size:.62rem;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:4px;">GS✔</span>';
-    if(cko) tags+='<span style="font-size:.62rem;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:4px;">KO✔</span>';
-    var unl='';
-    if(cgs) unl+='<button onclick="resetUserGS(\''+name+'\')" style="padding:5px 9px;background:rgba(251,191,36,.2);color:#b45309;border:1px solid #d97706;border-radius:5px;cursor:pointer;font-size:.72rem;font-weight:700;">↺ GS</button>';
-    if(cko) unl+='<button onclick="resetUserKO(\''+name+'\')" style="padding:5px 9px;background:rgba(147,197,253,.25);color:#1d4ed8;border:1px solid #93c5fd;border-radius:5px;cursor:pointer;font-size:.72rem;font-weight:700;">↺ KO</button>';
+    var CONF_ROUNDS=[
+      {field:'confirmedGS',  label:'GS',   fn:'resetUserConf',  bg:'#dcfce7',tc:'#15803d'},
+      {field:'confirmedR32', label:'R32',  fn:'resetUserConf',  bg:'#fef9c3',tc:'#854d0e'},
+      {field:'confirmedR16', label:'R16',  fn:'resetUserConf',  bg:'#dbeafe',tc:'#1d4ed8'},
+      {field:'confirmedQF',  label:'QF',   fn:'resetUserConf',  bg:'#ede9fe',tc:'#6d28d9'},
+      {field:'confirmedSF',  label:'SF',   fn:'resetUserConf',  bg:'#fce7f3',tc:'#9d174d'},
+      {field:'confirmedFinal',label:'FIN', fn:'resetUserConf',  bg:'#ffedd5',tc:'#c2410c'},
+    ];
+    var tags='', unl='';
+    CONF_ROUNDS.forEach(function(r){
+      if(u[r.field]){
+        tags+='<span style="font-size:.62rem;background:'+r.bg+';color:'+r.tc+';border-radius:4px;padding:1px 6px;font-weight:700;margin-left:3px;">'+r.label+'✔</span>';
+        unl+='<button onclick="resetUserConf(\''+name+'\',\''+r.field+'\')" style="padding:4px 7px;background:rgba(0,0,0,.06);color:#475569;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;font-size:.68rem;font-weight:700;">↺ '+r.label+'</button>';
+      }
+    });
     return '<div class="player-card">'+
       '<div style="flex:1;min-width:0;">'+
       '<div style="font-weight:600;font-size:.9rem;">'+name+tags+'</div>'+
@@ -1067,7 +1117,7 @@ function renderManage(){
 }
 function approveUser(name){
   var p=DB.pending[name];if(!p) return;
-  DB.users[name]={pass:p.pass,predictions:{},score:0,confirmedGS:false,confirmedKO:false};
+  DB.users[name]={pass:p.pass,predictions:{},score:0,confirmedGS:false,confirmedR32:false,confirmedR16:false,confirmedQF:false,confirmedSF:false,confirmedFinal:false};
   delete DB.pending[name]; saveDB(); renderManage(); renderLeaderboard();
 }
 function rejectUser(name){
@@ -1078,13 +1128,9 @@ function removeUser(name){
   if(!confirm('Remove "'+name+'"? Cannot be undone.')) return;
   delete DB.users[name]; saveDB(); renderManage(); renderLeaderboard();
 }
-function resetUserGS(name){
+function resetUserConf(name,field){
   if(!DB.users[name]) return;
-  DB.users[name].confirmedGS=false; saveDB(); renderManage();
-}
-function resetUserKO(name){
-  if(!DB.users[name]) return;
-  DB.users[name].confirmedKO=false; saveDB(); renderManage();
+  DB.users[name][field]=false; saveDB(); renderManage();
 }
 function toggleLock(){
   DB.locked=!DB.locked; saveDB(); updateLockBtn();
@@ -1097,7 +1143,9 @@ function resetAllPredictions(){
   if(!confirm('Reset ALL player predictions and scores? Accounts will be kept.')) return;
   Object.keys(DB.users).forEach(function(n){
     DB.users[n].predictions={};DB.users[n].score=0;
-    DB.users[n].confirmedGS=false;DB.users[n].confirmedKO=false;
+    DB.users[n].confirmedGS=false;DB.users[n].confirmedR32=false;
+    DB.users[n].confirmedR16=false;DB.users[n].confirmedQF=false;
+    DB.users[n].confirmedSF=false;DB.users[n].confirmedFinal=false;
   });
   DB.answers={};DB.koTeams={};DB.awardAns={};DB.locked=false;DB.lastCalc=null;
   saveDB(); renderAll(); alert('All predictions reset.');

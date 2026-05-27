@@ -4,9 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>WC 2026 Predictor</title>
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 :root{
   --bg:#f0f4f8;--s1:#fff;--border:#e2e8f0;--accent:#e85d04;
@@ -291,24 +288,24 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <div class="loading-text">Loading WC 2026 Predictor...</div>
 </div>
 
-<!-- FIREBASE SETUP -->
+<!-- CLOUD SETUP -->
 <div id="setupScreen" style="display:none;">
   <div class="setup-box">
-    <div style="font-size:2rem;margin-bottom:8px;">🔥</div>
-    <div class="setup-title">Connect to Firebase</div>
-    <div class="setup-sub">To sync data across all devices, connect your Firebase Realtime Database. This only needs to be done once per browser.</div>
+    <div style="font-size:2rem;margin-bottom:8px;">☁️</div>
+    <div class="setup-title">Enable Cross-Device Sync</div>
+    <div class="setup-sub">Paste your Firebase Realtime Database URL below so all devices share the same data. Only needs to be done once per browser.</div>
     <div class="setup-steps">
-      <b>Step 1:</b> Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a><br>
-      <b>Step 2:</b> Create a project → Add web app → copy the <b>firebaseConfig</b> object<br>
-      <b>Step 3:</b> In Firebase: Build → Realtime Database → Create database (<b>test mode</b>)<br>
-      <b>Step 4:</b> Paste the config object below and click Connect
+      <b>Step 1:</b> Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → Create project<br>
+      <b>Step 2:</b> Build → Realtime Database → Create database → choose <b>test mode</b><br>
+      <b>Step 3:</b> Copy the Database URL (looks like <b>https://your-app-default-rtdb.firebaseio.com</b>)<br>
+      <b>Step 4:</b> Paste it below and click Connect
     </div>
-    <div class="setup-label">Paste your firebaseConfig object</div>
-    <textarea class="setup-textarea" id="fbConfigInput" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"https://your-project-default-rtdb.firebaseio.com","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+    <div class="setup-label">Firebase Database URL</div>
+    <input class="setup-input" id="dbUrlInput" placeholder="https://your-app-default-rtdb.firebaseio.com" style="margin-bottom:0;"/>
     <div class="setup-msg" id="setupMsg"></div>
-    <button class="setup-btn" onclick="connectFirebase()">Connect &amp; Save →</button>
+    <button class="setup-btn" onclick="connectCloud()">Connect &amp; Sync →</button>
     <div class="setup-or">— or —</div>
-    <button class="setup-btn" style="background:#64748b;box-shadow:none;font-size:.82rem;padding:10px;" onclick="useLocalStorage()">Continue without Firebase (device-only)</button>
+    <button class="setup-btn" style="background:#64748b;box-shadow:none;font-size:.82rem;padding:10px;" onclick="skipCloud()">Skip — use this device only</button>
   </div>
 </div>
 
@@ -476,7 +473,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
               <button class="btn-red" onclick="resetAllPredictions()">🗑️ Reset All Predictions</button>
               <button class="btn-red" onclick="resetEverything()" style="background:#7f1d1d;">💥 Full Reset</button>
-              <button class="btn-red" onclick="changeFirebaseConfig()" style="background:#1e3a5f;">🔥 Change Firebase Config</button>
+              <button class="btn-red" onclick="changeDbUrl()" style="background:#1e3a5f;">☁️ Change Sync URL</button>
             </div>
           </div>
         </div>
@@ -627,60 +624,47 @@ function fl(t){
   return img+t;
 }
 
-// ══════════════════════════════════════════════════
-//  FIREBASE CONFIG — replace with your project values
-//  1. Go to console.firebase.google.com
-//  2. Create project → Add web app → copy config below
-//  3. In Firebase console: Build → Realtime Database → Create database (test mode)
-// ══════════════════════════════════════════════════
-var FIREBASE_CONFIG = {
-  apiKey: "PASTE_YOUR_API_KEY",
-  authDomain: "PASTE_YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://PASTE_YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID"
-};
-// ══════════════════════════════════════════════════
-
-var STORE='wc2026_v3'; // localStorage fallback key
-var FB_CFG_STORE='wc2026_firebase_cfg'; // saved Firebase config key
-var DB_REF = null;
+var STORE='wc2026_v3';
+var DB_URL_KEY='wc2026_db_url';
+var DB_URL = (localStorage.getItem(DB_URL_KEY)||'').replace(/\/+$/,''); // e.g. https://xxx-default-rtdb.firebaseio.com
+var _usingCloud = !!DB_URL;
+var _pollInterval = null;
 var DB, currentUser, isAdmin;
 var _renderTimer = null;
 
-// Check for user-saved Firebase config in localStorage first
-(function(){
-  try{
-    var saved=localStorage.getItem(FB_CFG_STORE);
-    if(saved){
-      var parsed=JSON.parse(saved);
-      if(parsed && parsed.apiKey && parsed.apiKey!=='PASTE_YOUR_API_KEY'){
-        FIREBASE_CONFIG=parsed;
-      }
-    }
-  }catch(e){}
-})();
-
-var _usingFirebase = (FIREBASE_CONFIG.apiKey !== 'PASTE_YOUR_API_KEY');
-
-function connectFirebase(){
-  var raw=document.getElementById('fbConfigInput').value.trim();
-  var msgEl=document.getElementById('setupMsg');
-  // Extract JSON object from pasted text (handle `var firebaseConfig = {...}` format too)
-  var match=raw.match(/\{[\s\S]*\}/);
-  if(!match){ msgEl.textContent='Could not find a config object. Paste just the {...} part.'; return; }
-  var cfg;
-  try{ cfg=JSON.parse(match[0]); }catch(e){ msgEl.textContent='Invalid JSON: '+e.message; return; }
-  if(!cfg.apiKey||!cfg.databaseURL){ msgEl.textContent='Missing apiKey or databaseURL in config.'; return; }
-  localStorage.setItem(FB_CFG_STORE, JSON.stringify(cfg));
-  msgEl.style.color='#16a34a';
-  msgEl.textContent='Config saved! Connecting...';
-  setTimeout(function(){ location.reload(); }, 800);
+// ── Cloud save/load via Firebase REST API (no SDK, no API key needed in test mode) ──
+function cloudGet(cb){
+  fetch(DB_URL+'/wc2026.json')
+    .then(function(r){ return r.json(); })
+    .then(function(d){ cb(null,d); })
+    .catch(function(e){ cb(e,null); });
+}
+function cloudPut(data){
+  fetch(DB_URL+'/wc2026.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+    .catch(function(e){ console.warn('Cloud save failed',e); });
 }
 
-function useLocalStorage(){
+function connectCloud(){
+  var url=(document.getElementById('dbUrlInput').value||'').trim().replace(/\/+$/,'');
+  var msgEl=document.getElementById('setupMsg');
+  if(!url||!url.startsWith('https://')){
+    msgEl.textContent='Please enter a valid https:// URL.'; return;
+  }
+  msgEl.textContent='Testing connection...'; msgEl.style.color='#64748b';
+  fetch(url+'/wc2026.json')
+    .then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      localStorage.setItem(DB_URL_KEY, url);
+      msgEl.style.color='#16a34a';
+      msgEl.textContent='Connected! Loading...';
+      setTimeout(function(){ location.reload(); }, 700);
+    })
+    .catch(function(e){
+      msgEl.style.color='#dc2626';
+      msgEl.textContent='Connection failed: '+e.message+'. Check the URL and that rules are in test mode.';
+    });
+}
+function skipCloud(){
   document.getElementById('setupScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
 }
@@ -706,15 +690,42 @@ function migrateDB(d){
   return d;
 }
 function saveDB(){
-  localStorage.setItem(STORE, JSON.stringify(DB));
+  if(_usingCloud){
+    cloudPut(JSON.parse(JSON.stringify(DB)));
+  }
+  localStorage.setItem(STORE, JSON.stringify(DB)); // always keep local copy too
 }
 
 // ── Bootstrap: load data then show login ──
 (function(){
-  try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
-  catch(e){ DB=defaultDB(); }
-  document.getElementById('loadingScreen').style.display='none';
-  document.getElementById('loginScreen').style.display='flex';
+  function showLogin(){
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('loginScreen').style.display='flex';
+  }
+  function showSetup(){
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('setupScreen').style.display='flex';
+  }
+  if(_usingCloud){
+    cloudGet(function(err,data){
+      if(err){
+        // Bad URL saved — clear it and show setup
+        localStorage.removeItem(DB_URL_KEY);
+        _usingCloud=false; DB_URL='';
+        try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
+        catch(e){ DB=defaultDB(); }
+        showLogin();
+        return;
+      }
+      DB=migrateDB(data);
+      if(!data) saveDB();
+      showLogin();
+    });
+  } else {
+    try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
+    catch(e){ DB=defaultDB(); }
+    showLogin();
+  }
 })();
 
 currentUser=null; isAdmin=false;
@@ -785,7 +796,7 @@ function doSignup(){
   document.getElementById('pReg2').value='';
 }
 function doLogout(){
-  if(_usingFirebase && DB_REF) DB_REF.off(); // remove real-time listener
+  if(_pollInterval){ clearInterval(_pollInterval); _pollInterval=null; }
   clearTimeout(_renderTimer);
   currentUser=null; isAdmin=false;
   document.getElementById('app').style.display='none';
@@ -804,15 +815,17 @@ function startApp(){
   document.getElementById('scoreChip').style.display=isAdmin?'none':'';
   renderAll();
   showPanel('groups');
-  // Real-time sync: when another device changes data, update this UI
-  if(_usingFirebase && DB_REF){
-    DB_REF.on('value', function(snapshot){
+  // Poll cloud every 6 seconds so changes from other devices appear
+  if(_usingCloud){
+    _pollInterval=setInterval(function(){
       if(!currentUser) return;
-      DB=migrateDB(snapshot.val());
-      // Debounce re-renders so rapid local saves don't flicker
-      clearTimeout(_renderTimer);
-      _renderTimer=setTimeout(function(){ renderAll(); }, 600);
-    });
+      cloudGet(function(err,data){
+        if(err||!data) return;
+        DB=migrateDB(data);
+        clearTimeout(_renderTimer);
+        _renderTimer=setTimeout(function(){ renderAll(); }, 300);
+      });
+    }, 6000);
   }
 }
 
@@ -1215,9 +1228,9 @@ function resetEverything(){
   localStorage.removeItem(STORE);
   DB=defaultDB(); saveDB(); renderAll(); alert('Full reset complete.');
 }
-function changeFirebaseConfig(){
-  if(!confirm('This will clear the saved Firebase config and reload the page to the setup screen.')) return;
-  localStorage.removeItem(FB_CFG_STORE);
+function changeDbUrl(){
+  if(!confirm('This will clear the saved database URL and reload to the setup screen.')) return;
+  localStorage.removeItem(DB_URL_KEY);
   location.reload();
 }
 </script>

@@ -251,32 +251,6 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 @keyframes spin{to{transform:rotate(360deg);}}
 .loading-text{color:#fff;font-size:.95rem;font-weight:600;opacity:.85;}
 
-/* ── FIREBASE SETUP SCREEN ── */
-#setupScreen{position:fixed;inset:0;background:linear-gradient(135deg,var(--navy) 0%,var(--accent) 100%);
-  display:none;align-items:center;justify-content:center;z-index:9998;padding:16px;}
-.setup-box{background:#fff;border-radius:20px;padding:32px 28px;width:100%;max-width:480px;
-  box-shadow:0 24px 60px rgba(0,0,0,.25);}
-.setup-title{font-size:1.2rem;font-weight:800;color:var(--navy);margin-bottom:6px;}
-.setup-sub{font-size:.78rem;color:var(--muted);margin-bottom:18px;line-height:1.5;}
-.setup-steps{background:#f8fafc;border-radius:10px;padding:14px 16px;margin-bottom:18px;
-  font-size:.78rem;color:#334155;line-height:1.8;}
-.setup-steps b{color:var(--navy);}
-.setup-steps a{color:var(--accent);text-decoration:none;font-weight:700;}
-.setup-label{font-size:.72rem;font-weight:700;color:#475569;text-transform:uppercase;
-  letter-spacing:.04em;margin-bottom:5px;}
-.setup-input{width:100%;padding:10px 13px;border:1.5px solid #cbd5e1;border-radius:8px;
-  font-size:.82rem;color:var(--text);background:#f8fafc;outline:none;margin-bottom:10px;}
-.setup-input:focus{border-color:var(--blue);background:#fff;}
-.setup-textarea{width:100%;padding:10px 13px;border:1.5px solid #cbd5e1;border-radius:8px;
-  font-size:.75rem;color:var(--text);background:#f8fafc;outline:none;font-family:monospace;
-  height:150px;resize:vertical;}
-.setup-textarea:focus{border-color:var(--blue);background:#fff;}
-.setup-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),#f97316);
-  color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:800;cursor:pointer;
-  margin-top:12px;box-shadow:0 4px 14px rgba(232,93,4,.35);}
-.setup-btn:hover{opacity:.9;}
-.setup-msg{font-size:.8rem;color:var(--red);margin-top:8px;min-height:18px;}
-.setup-or{text-align:center;font-size:.75rem;color:var(--muted);margin:10px 0;}
 </style>
 </head>
 <body>
@@ -288,26 +262,6 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <div class="loading-text">Loading WC 2026 Predictor...</div>
 </div>
 
-<!-- CLOUD SETUP -->
-<div id="setupScreen" style="display:none;">
-  <div class="setup-box">
-    <div style="font-size:2rem;margin-bottom:8px;">☁️</div>
-    <div class="setup-title">Enable Cross-Device Sync</div>
-    <div class="setup-sub">Paste your Firebase Realtime Database URL below so all devices share the same data. Only needs to be done once per browser.</div>
-    <div class="setup-steps">
-      <b>Step 1:</b> Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → Create project<br>
-      <b>Step 2:</b> Build → Realtime Database → Create database → choose <b>test mode</b><br>
-      <b>Step 3:</b> Copy the Database URL (looks like <b>https://your-app-default-rtdb.firebaseio.com</b>)<br>
-      <b>Step 4:</b> Paste it below and click Connect
-    </div>
-    <div class="setup-label">Firebase Database URL</div>
-    <input class="setup-input" id="dbUrlInput" placeholder="https://your-app-default-rtdb.firebaseio.com" style="margin-bottom:0;"/>
-    <div class="setup-msg" id="setupMsg"></div>
-    <button class="setup-btn" onclick="connectCloud()">Connect &amp; Sync →</button>
-    <div class="setup-or">— or —</div>
-    <button class="setup-btn" style="background:#64748b;box-shadow:none;font-size:.82rem;padding:10px;" onclick="skipCloud()">Skip — use this device only</button>
-  </div>
-</div>
 
 <!-- LOGIN -->
 <div id="loginScreen" style="display:none;">
@@ -473,7 +427,6 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
               <button class="btn-red" onclick="resetAllPredictions()">🗑️ Reset All Predictions</button>
               <button class="btn-red" onclick="resetEverything()" style="background:#7f1d1d;">💥 Full Reset</button>
-              <button class="btn-red" onclick="changeDbUrl()" style="background:#1e3a5f;">☁️ Change Sync URL</button>
             </div>
           </div>
         </div>
@@ -625,48 +578,23 @@ function fl(t){
 }
 
 var STORE='wc2026_v3';
-var DB_URL_KEY='wc2026_db_url';
-var DB_URL = (localStorage.getItem(DB_URL_KEY)||'').replace(/\/+$/,''); // e.g. https://xxx-default-rtdb.firebaseio.com
-var _usingCloud = !!DB_URL;
+// Shared cloud storage — syncs data across all devices automatically
+var BLOB_URL='https://jsonblob.com/api/jsonBlob/019e689b-4972-72bd-9bf9-f067bd7b6a11';
 var _pollInterval = null;
 var DB, currentUser, isAdmin;
 var _renderTimer = null;
 
-// ── Cloud save/load via Firebase REST API (no SDK, no API key needed in test mode) ──
 function cloudGet(cb){
-  fetch(DB_URL+'/wc2026.json')
-    .then(function(r){ return r.json(); })
+  fetch(BLOB_URL,{headers:{'Accept':'application/json'}})
+    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(d){ cb(null,d); })
     .catch(function(e){ cb(e,null); });
 }
 function cloudPut(data){
-  fetch(DB_URL+'/wc2026.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  fetch(BLOB_URL,{method:'PUT',
+    headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify(data)})
     .catch(function(e){ console.warn('Cloud save failed',e); });
-}
-
-function connectCloud(){
-  var url=(document.getElementById('dbUrlInput').value||'').trim().replace(/\/+$/,'');
-  var msgEl=document.getElementById('setupMsg');
-  if(!url||!url.startsWith('https://')){
-    msgEl.textContent='Please enter a valid https:// URL.'; return;
-  }
-  msgEl.textContent='Testing connection...'; msgEl.style.color='#64748b';
-  fetch(url+'/wc2026.json')
-    .then(function(r){
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      localStorage.setItem(DB_URL_KEY, url);
-      msgEl.style.color='#16a34a';
-      msgEl.textContent='Connected! Loading...';
-      setTimeout(function(){ location.reload(); }, 700);
-    })
-    .catch(function(e){
-      msgEl.style.color='#dc2626';
-      msgEl.textContent='Connection failed: '+e.message+'. Check the URL and that rules are in test mode.';
-    });
-}
-function skipCloud(){
-  document.getElementById('setupScreen').style.display='none';
-  document.getElementById('loginScreen').style.display='flex';
 }
 
 function defaultDB(){
@@ -690,42 +618,24 @@ function migrateDB(d){
   return d;
 }
 function saveDB(){
-  if(_usingCloud){
-    cloudPut(JSON.parse(JSON.stringify(DB)));
-  }
-  localStorage.setItem(STORE, JSON.stringify(DB)); // always keep local copy too
+  cloudPut(JSON.parse(JSON.stringify(DB)));
+  localStorage.setItem(STORE, JSON.stringify(DB));
 }
 
-// ── Bootstrap: load data then show login ──
+// ── Bootstrap: load from cloud then show login ──
 (function(){
-  function showLogin(){
-    document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('loginScreen').style.display='flex';
-  }
-  function showSetup(){
-    document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('setupScreen').style.display='flex';
-  }
-  if(_usingCloud){
-    cloudGet(function(err,data){
-      if(err){
-        // Bad URL saved — clear it and show setup
-        localStorage.removeItem(DB_URL_KEY);
-        _usingCloud=false; DB_URL='';
-        try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
-        catch(e){ DB=defaultDB(); }
-        showLogin();
-        return;
-      }
+  cloudGet(function(err,data){
+    if(err){
+      // Cloud unavailable — fall back to localStorage
+      try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
+      catch(e2){ DB=defaultDB(); }
+    } else {
       DB=migrateDB(data);
       if(!data) saveDB();
-      showLogin();
-    });
-  } else {
-    try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
-    catch(e){ DB=defaultDB(); }
-    showLogin();
-  }
+    }
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('loginScreen').style.display='flex';
+  });
 })();
 
 currentUser=null; isAdmin=false;
@@ -816,17 +726,15 @@ function startApp(){
   renderAll();
   showPanel('groups');
   // Poll cloud every 6 seconds so changes from other devices appear
-  if(_usingCloud){
-    _pollInterval=setInterval(function(){
-      if(!currentUser) return;
-      cloudGet(function(err,data){
-        if(err||!data) return;
-        DB=migrateDB(data);
-        clearTimeout(_renderTimer);
-        _renderTimer=setTimeout(function(){ renderAll(); }, 300);
-      });
-    }, 6000);
-  }
+  _pollInterval=setInterval(function(){
+    if(!currentUser) return;
+    cloudGet(function(err,data){
+      if(err||!data) return;
+      DB=migrateDB(data);
+      clearTimeout(_renderTimer);
+      _renderTimer=setTimeout(function(){ renderAll(); }, 300);
+    });
+  }, 6000);
 }
 
 // CONFIRM — one function per round
@@ -1227,11 +1135,6 @@ function resetEverything(){
   if(!confirm('This cannot be undone. Confirm?')) return;
   localStorage.removeItem(STORE);
   DB=defaultDB(); saveDB(); renderAll(); alert('Full reset complete.');
-}
-function changeDbUrl(){
-  if(!confirm('This will clear the saved database URL and reload to the setup screen.')) return;
-  localStorage.removeItem(DB_URL_KEY);
-  location.reload();
 }
 </script>
 </body>

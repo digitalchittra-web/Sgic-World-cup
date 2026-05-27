@@ -19,8 +19,8 @@ module.exports = async function handler(req, res) {
       });
       if (r.status === 404) return res.status(200).json(null);
       if (!r.ok) throw new Error(`EC read failed: ${r.status}`);
-      const value = await r.json();
-      return res.status(200).json(value);
+      const item = await r.json();
+      return res.status(200).json(item.value !== undefined ? item.value : item);
     }
 
     if (req.method === 'PUT') {

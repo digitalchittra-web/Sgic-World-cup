@@ -706,35 +706,15 @@ function migrateDB(d){
   return d;
 }
 function saveDB(){
-  if(_usingFirebase && DB_REF){
-    DB_REF.set(JSON.parse(JSON.stringify(DB)));
-  } else {
-    localStorage.setItem(STORE, JSON.stringify(DB));
-  }
+  localStorage.setItem(STORE, JSON.stringify(DB));
 }
 
 // ── Bootstrap: load data then show login ──
 (function(){
-  if(!_usingFirebase){
-    // No Firebase config — show setup screen
-    document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('setupScreen').style.display='flex';
-    return;
-  }
-  try{ firebase.initializeApp(FIREBASE_CONFIG); }catch(e){}
-  DB_REF = firebase.database().ref('wc2026');
-  DB_REF.once('value', function(snapshot){
-    DB = migrateDB(snapshot.val());
-    if(!snapshot.val()){ saveDB(); }
-    document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('loginScreen').style.display='flex';
-  }, function(err){
-    // Firebase error — clear saved bad config and show setup screen
-    localStorage.removeItem(FB_CFG_STORE);
-    document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('setupScreen').style.display='flex';
-    document.getElementById('setupMsg').textContent='Connection failed: '+err.message+'. Please check your config and try again.';
-  });
+  try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
+  catch(e){ DB=defaultDB(); }
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
 })();
 
 currentUser=null; isAdmin=false;

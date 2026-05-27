@@ -667,26 +667,15 @@ function doLogin(){
   var name=document.getElementById('uLogin').value.trim();
   var pass=document.getElementById('pLogin').value;
   if(!name||!pass) return msg('Enter username and password.',false);
-  msg('Checking...', true);
-  // Always fetch fresh DB from Firebase before login check
-  function check(){
-    if(name.toLowerCase()==='admin'){
-      if(pass!==DB.adminPass) return msg('Wrong admin password.',false);
-      currentUser='Admin'; isAdmin=true; startApp(); return;
-    }
-    if(DB.pending[name]) return msg('Your account is pending admin approval.',false);
-    var u=DB.users[name];
-    if(!u) return msg('Account not found. Please sign up.',false);
-    if(u.pass!==pass) return msg('Wrong password.',false);
-    currentUser=name; isAdmin=false; startApp();
+  if(name.toLowerCase()==='admin'){
+    if(pass!==DB.adminPass) return msg('Wrong admin password.',false);
+    currentUser='Admin'; isAdmin=true; startApp(); return;
   }
-  if(_usingFirebase && DB_REF){
-    DB_REF.once('value', function(snapshot){
-      DB=migrateDB(snapshot.val()); check();
-    }, function(){ check(); });
-  } else {
-    check();
-  }
+  if(DB.pending[name]) return msg('Your account is pending admin approval.',false);
+  var u=DB.users[name];
+  if(!u) return msg('Account not found. Please sign up.',false);
+  if(u.pass!==pass) return msg('Wrong password.',false);
+  currentUser=name; isAdmin=false; startApp();
 }
 function doSignup(){
   var name=document.getElementById('uReg').value.trim();

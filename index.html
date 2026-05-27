@@ -253,6 +253,33 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .loading-text{color:#fff;font-size:.95rem;font-weight:600;opacity:.85;}
+
+/* ── FIREBASE SETUP SCREEN ── */
+#setupScreen{position:fixed;inset:0;background:linear-gradient(135deg,var(--navy) 0%,var(--accent) 100%);
+  display:none;align-items:center;justify-content:center;z-index:9998;padding:16px;}
+.setup-box{background:#fff;border-radius:20px;padding:32px 28px;width:100%;max-width:480px;
+  box-shadow:0 24px 60px rgba(0,0,0,.25);}
+.setup-title{font-size:1.2rem;font-weight:800;color:var(--navy);margin-bottom:6px;}
+.setup-sub{font-size:.78rem;color:var(--muted);margin-bottom:18px;line-height:1.5;}
+.setup-steps{background:#f8fafc;border-radius:10px;padding:14px 16px;margin-bottom:18px;
+  font-size:.78rem;color:#334155;line-height:1.8;}
+.setup-steps b{color:var(--navy);}
+.setup-steps a{color:var(--accent);text-decoration:none;font-weight:700;}
+.setup-label{font-size:.72rem;font-weight:700;color:#475569;text-transform:uppercase;
+  letter-spacing:.04em;margin-bottom:5px;}
+.setup-input{width:100%;padding:10px 13px;border:1.5px solid #cbd5e1;border-radius:8px;
+  font-size:.82rem;color:var(--text);background:#f8fafc;outline:none;margin-bottom:10px;}
+.setup-input:focus{border-color:var(--blue);background:#fff;}
+.setup-textarea{width:100%;padding:10px 13px;border:1.5px solid #cbd5e1;border-radius:8px;
+  font-size:.75rem;color:var(--text);background:#f8fafc;outline:none;font-family:monospace;
+  height:150px;resize:vertical;}
+.setup-textarea:focus{border-color:var(--blue);background:#fff;}
+.setup-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),#f97316);
+  color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:800;cursor:pointer;
+  margin-top:12px;box-shadow:0 4px 14px rgba(232,93,4,.35);}
+.setup-btn:hover{opacity:.9;}
+.setup-msg{font-size:.8rem;color:var(--red);margin-top:8px;min-height:18px;}
+.setup-or{text-align:center;font-size:.75rem;color:var(--muted);margin:10px 0;}
 </style>
 </head>
 <body>
@@ -262,6 +289,27 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <div style="font-size:3rem;">⚽</div>
   <div class="spinner"></div>
   <div class="loading-text">Loading WC 2026 Predictor...</div>
+</div>
+
+<!-- FIREBASE SETUP -->
+<div id="setupScreen" style="display:none;">
+  <div class="setup-box">
+    <div style="font-size:2rem;margin-bottom:8px;">🔥</div>
+    <div class="setup-title">Connect to Firebase</div>
+    <div class="setup-sub">To sync data across all devices, connect your Firebase Realtime Database. This only needs to be done once per browser.</div>
+    <div class="setup-steps">
+      <b>Step 1:</b> Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a><br>
+      <b>Step 2:</b> Create a project → Add web app → copy the <b>firebaseConfig</b> object<br>
+      <b>Step 3:</b> In Firebase: Build → Realtime Database → Create database (<b>test mode</b>)<br>
+      <b>Step 4:</b> Paste the config object below and click Connect
+    </div>
+    <div class="setup-label">Paste your firebaseConfig object</div>
+    <textarea class="setup-textarea" id="fbConfigInput" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"https://your-project-default-rtdb.firebaseio.com","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+    <div class="setup-msg" id="setupMsg"></div>
+    <button class="setup-btn" onclick="connectFirebase()">Connect &amp; Save →</button>
+    <div class="setup-or">— or —</div>
+    <button class="setup-btn" style="background:#64748b;box-shadow:none;font-size:.82rem;padding:10px;" onclick="useLocalStorage()">Continue without Firebase (device-only)</button>
+  </div>
 </div>
 
 <!-- LOGIN -->
@@ -428,6 +476,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
               <button class="btn-red" onclick="resetAllPredictions()">🗑️ Reset All Predictions</button>
               <button class="btn-red" onclick="resetEverything()" style="background:#7f1d1d;">💥 Full Reset</button>
+              <button class="btn-red" onclick="changeFirebaseConfig()" style="background:#1e3a5f;">🔥 Change Firebase Config</button>
             </div>
           </div>
         </div>
@@ -596,10 +645,45 @@ var FIREBASE_CONFIG = {
 // ══════════════════════════════════════════════════
 
 var STORE='wc2026_v3'; // localStorage fallback key
+var FB_CFG_STORE='wc2026_firebase_cfg'; // saved Firebase config key
 var DB_REF = null;
 var DB, currentUser, isAdmin;
 var _renderTimer = null;
+
+// Check for user-saved Firebase config in localStorage first
+(function(){
+  try{
+    var saved=localStorage.getItem(FB_CFG_STORE);
+    if(saved){
+      var parsed=JSON.parse(saved);
+      if(parsed && parsed.apiKey && parsed.apiKey!=='PASTE_YOUR_API_KEY'){
+        FIREBASE_CONFIG=parsed;
+      }
+    }
+  }catch(e){}
+})();
+
 var _usingFirebase = (FIREBASE_CONFIG.apiKey !== 'PASTE_YOUR_API_KEY');
+
+function connectFirebase(){
+  var raw=document.getElementById('fbConfigInput').value.trim();
+  var msgEl=document.getElementById('setupMsg');
+  // Extract JSON object from pasted text (handle `var firebaseConfig = {...}` format too)
+  var match=raw.match(/\{[\s\S]*\}/);
+  if(!match){ msgEl.textContent='Could not find a config object. Paste just the {...} part.'; return; }
+  var cfg;
+  try{ cfg=JSON.parse(match[0]); }catch(e){ msgEl.textContent='Invalid JSON: '+e.message; return; }
+  if(!cfg.apiKey||!cfg.databaseURL){ msgEl.textContent='Missing apiKey or databaseURL in config.'; return; }
+  localStorage.setItem(FB_CFG_STORE, JSON.stringify(cfg));
+  msgEl.style.color='#16a34a';
+  msgEl.textContent='Config saved! Connecting...';
+  setTimeout(function(){ location.reload(); }, 800);
+}
+
+function useLocalStorage(){
+  document.getElementById('setupScreen').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+}
 
 function defaultDB(){
   return {adminPass:'admin2026',users:{},pending:{},answers:{},koTeams:{},awardAns:{},locked:false,lastCalc:null};
@@ -632,11 +716,9 @@ function saveDB(){
 // ── Bootstrap: load data then show login ──
 (function(){
   if(!_usingFirebase){
-    // localStorage fallback
-    try{ var d=JSON.parse(localStorage.getItem(STORE)); DB=migrateDB(d||null); }
-    catch(e){ DB=defaultDB(); }
+    // No Firebase config — show setup screen
     document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('loginScreen').style.display='flex';
+    document.getElementById('setupScreen').style.display='flex';
     return;
   }
   try{ firebase.initializeApp(FIREBASE_CONFIG); }catch(e){}
@@ -647,14 +729,11 @@ function saveDB(){
     document.getElementById('loadingScreen').style.display='none';
     document.getElementById('loginScreen').style.display='flex';
   }, function(err){
-    // Firebase error — show message
-    document.getElementById('loadingScreen').innerHTML=
-      '<div style="text-align:center;color:#fff;padding:40px;max-width:340px;">'+
-      '<div style="font-size:2.5rem;">⚠️</div>'+
-      '<div style="font-size:1.1rem;font-weight:700;margin-top:12px;">Firebase not configured</div>'+
-      '<div style="font-size:.82rem;margin-top:10px;opacity:.85;line-height:1.6;">'+
-      'Open the HTML file and replace the values inside <b>FIREBASE_CONFIG</b> with your Firebase project credentials.<br><br>'+
-      'Error: '+err.message+'</div></div>';
+    // Firebase error — clear saved bad config and show setup screen
+    localStorage.removeItem(FB_CFG_STORE);
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('setupScreen').style.display='flex';
+    document.getElementById('setupMsg').textContent='Connection failed: '+err.message+'. Please check your config and try again.';
   });
 })();
 
@@ -1155,6 +1234,11 @@ function resetEverything(){
   if(!confirm('This cannot be undone. Confirm?')) return;
   localStorage.removeItem(STORE);
   DB=defaultDB(); saveDB(); renderAll(); alert('Full reset complete.');
+}
+function changeFirebaseConfig(){
+  if(!confirm('This will clear the saved Firebase config and reload the page to the setup screen.')) return;
+  localStorage.removeItem(FB_CFG_STORE);
+  location.reload();
 }
 </script>
 </body>
